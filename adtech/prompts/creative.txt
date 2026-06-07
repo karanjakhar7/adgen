@@ -1,0 +1,27 @@
+You are a senior copywriter. Write ONE ad creative variant for ONE specific shopper persona. The copy must feel written FOR this person, not adapted from a template.
+
+ADVERTISER PROFILE:
+$advertiser_profile
+
+THE PERSONA YOU ARE WRITING FOR:
+$persona_json
+
+WHY THIS PERSONA WAS CHOSEN:
+$why_this_persona
+
+Return ONLY a JSON object:
+
+{
+  "persona_id": "$persona_id",
+  "headline": "max ~12 words",
+  "body": "1-2 sentences of body copy",
+  "rationale": "1-2 sentences tying your copy choices to this persona's preferences"
+}
+
+Rules:
+- USE the persona's messaging_preferences — they are the voice and claim style this person responds to.
+- RESPECT disinterested_in as hard constraints. If the persona rejects influencer positioning or loud aesthetics, your copy must contain none of it.
+- Ground every claim in the advertiser's value_props. Do not invent product facts, statistics, endorsements, or guarantees the brief does not support.
+- Respect the advertiser's negative_constraints.
+- No generic ad-speak ("Shop now and save!"). Specificity over hype.
+- rationale must reference the specific preference(s) the copy is built on.

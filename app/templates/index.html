@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>adgen — campaign draft generator</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #181b24; --panel2: #1f2330; --border: #2a2f3e;
+    --text: #e6e8ee; --muted: #8b91a3; --accent: #6c8cff; --good: #4ade80;
+    --warn: #fbbf24; --bad: #f87171; --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  textarea { width: 100%; min-height: 84px; padding: 12px 14px; border-radius: var(--radius);
+             border: 1px solid var(--border); background: var(--panel); color: var(--text);
+             font: inherit; resize: vertical; }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  .row { display: flex; gap: 10px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
+  input[type=number] { width: 150px; padding: 9px 12px; border-radius: var(--radius);
+             border: 1px solid var(--border); background: var(--panel); color: var(--text); font: inherit; }
+  button.run { padding: 10px 22px; border-radius: var(--radius); border: none; cursor: pointer;
+               background: var(--accent); color: #fff; font: inherit; font-weight: 600; }
+  button.run:disabled { opacity: .5; cursor: default; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .chip { padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); cursor: pointer;
+          background: var(--panel); color: var(--muted); font-size: 13px; }
+  .chip:hover { color: var(--text); border-color: var(--accent); }
+
+  .timeline { margin: 28px 0 0; display: none; }
+  .step { display: flex; gap: 12px; padding: 8px 0; align-items: baseline; }
+  .dot { width: 18px; text-align: center; flex: none; color: var(--muted); }
+  .step.running .dot::before { content: "◐"; color: var(--accent); display: inline-block;
+                               animation: spin 1s linear infinite; }
+  .step.done .dot::before { content: "✓"; color: var(--good); }
+  .step.pending .dot::before { content: "·"; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .step .label { color: var(--muted); }
+  .step.done .label, .step.running .label { color: var(--text); }
+  .step .note { color: var(--muted); font-size: 13px; }
+  details.raw { margin-left: 30px; }
+  details.raw summary { color: var(--muted); font-size: 12px; cursor: pointer; }
+  details.raw pre { max-height: 260px; overflow: auto; background: var(--panel); padding: 10px;
+                    border-radius: 8px; font-size: 12px; }
+
+  .report { margin-top: 28px; display: none; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+          padding: 18px 20px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .06em;
+             color: var(--muted); }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px;
+           font-weight: 600; margin-right: 6px; border: 1px solid var(--border); }
+  .badge.good { color: var(--good); } .badge.warn { color: var(--warn); } .badge.bad { color: var(--bad); }
+  .pub { padding: 12px 0; border-top: 1px solid var(--border); }
+  .pub:first-of-type { border-top: none; }
+  .pub .head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .pub .name { font-weight: 600; }
+  .pub .pct { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .bar { height: 6px; background: var(--panel2); border-radius: 3px; margin: 8px 0; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+  ul.reasons { margin: 6px 0 0; padding-left: 20px; color: var(--muted); font-size: 14px; }
+  .creative { border-top: 1px solid var(--border); padding: 14px 0; }
+  .creative:first-of-type { border-top: none; }
+  .creative .persona { font-weight: 600; color: var(--accent); }
+  .creative .why, .creative .rationale { color: var(--muted); font-size: 13px; }
+  .creative .headline { font-size: 17px; font-weight: 600; margin: 6px 0 2px; }
+  .kv { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; font-size: 14px; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; }
+  .excl summary { cursor: pointer; color: var(--muted); }
+  .excl li { color: var(--muted); font-size: 14px; margin: 6px 0; }
+  .excl b { color: var(--text); font-weight: 600; }
+  .offtopic { border-color: var(--warn); }
+  .error { border-color: var(--bad); color: var(--bad); }
+  .assume li { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>adgen</h1>
+  <p class="sub">Describe your business in a sentence — get ranked publishers, persona-tuned creative, and a campaign config.</p>
+
+  <textarea id="brief" placeholder='e.g. "We sell premium dog food for senior dogs, targeting owners who care about joint health."'></textarea>
+  <div class="row">
+    <input id="budget" type="number" min="1" placeholder="Budget USD (opt.)">
+    <button class="run" id="run">Generate campaign</button>
+  </div>
+  <div class="chips" id="chips"></div>
+
+  <div class="timeline" id="timeline"></div>
+  <div class="report" id="report"></div>
+</div>
+
+<script>
+const EXAMPLES = [
+  "We sell premium dog food for senior dogs, targeting owners who care about joint health and longevity. Grain-free, vet-formulated, subscription-based.",
+  "A sustainable activewear brand for women. Made from recycled ocean plastic. Price point sits between Lululemon and Girlfriend Collective.",
+  "B2B SaaS for dental practices. We automate their patient recall workflow.",
+  "We help people feel better.",
+  "idk just try it",
+];
+
+const STAGES = [
+  ["interpret",  "1 · Interpret brief"],
+  ["signals",    "2 · Precompute fit signals"],
+  ["rank",       "3 · Rank publishers"],
+  ["personas",   "4 · Select personas"],
+  ["creative",   "5 · Generate creative"],
+  ["config",     "6 · Assemble config"],
+];
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// example chips
+for (const ex of EXAMPLES) {
+  const c = document.createElement("button");
+  c.className = "chip";
+  c.textContent = ex.length > 64 ? ex.slice(0, 61) + "…" : ex;
+  c.onclick = () => { $("brief").value = ex; };
+  $("chips").appendChild(c);
+}
+
+function stageNote(stage, data) {
+  switch (stage) {
+    case "interpret":  return `${esc(data.category)} · ${esc(data.price_tier)} · signal: ${esc(data.signal)}`;
+    case "signals":    return `${Object.keys(data).length} candidates scored mechanically`;
+    case "rank":       return `${data.scores.length} publishers scored`;
+    case "rank_split": return `${data.recommended.length} recommended, ${data.excluded_count} excluded`;
+    case "personas":   return `${data.personas.length} personas picked`;
+    case "creative":   return `${data.variants.length} variants written`;
+    case "config":     return `targeting: ${esc(data.targeting_mode)}`;
+    default:           return "";
+  }
+}
+
+function buildTimeline() {
+  $("timeline").innerHTML = STAGES.map(([key, label]) => `
+    <div class="step pending" id="step-${key}">
+      <span class="dot"></span>
+      <span><span class="label">${label}</span> <span class="note" id="note-${key}"></span></span>
+    </div>
+    <details class="raw" id="raw-${key}" hidden><summary>stage output</summary><pre></pre></details>
+  `).join("");
+  $("timeline").style.display = "block";
+  setState("interpret", "running");
+}
+
+function setState(key, state) {
+  const el = $(`step-${key}`);
+  if (el) el.className = `step ${state}`;
+}
+
+function startStage(stage) {
+  const key = stage === "rank_split" ? "rank" : stage;
+  setState(key, "running");
+}
+
+function completeStage(stage, data) {
+  const key = stage === "rank_split" ? "rank" : stage;
+  setState(key, "done");
+  const note = $(`note-${key}`);
+  if (note) note.textContent = stageNote(stage, data) || note.textContent;
+  const raw = $(`raw-${key}`);
+  if (raw) { raw.hidden = false; raw.querySelector("pre").textContent = JSON.stringify(data, null, 2); }
+  // mark the next pipeline stage as running
+  const order = STAGES.map(([k]) => k);
+  const next = order[order.indexOf(key) + 1];
+  if (next && $(`step-${next}`).className.includes("pending")) setState(next, "running");
+}
+
+function renderDraft(d) {
+  const p = d.advertiser_profile;
+  const cfg = d.campaign_config;
+  const sigBadge = p.signal === "clear" ? "good" : "warn";
+  const confBadge = p.confidence === "high" ? "good" : p.confidence === "medium" ? "warn" : "bad";
+
+  let html = `<div class="card">
+    <h2>Advertiser profile</h2>
+    <div style="margin-bottom:8px">
+      <span class="badge ${sigBadge}">signal: ${esc(p.signal)}</span>
+      <span class="badge ${confBadge}">confidence: ${esc(p.confidence)}</span>
+      <span class="badge">${esc(p.price_tier)}</span>
+      ${p.sensitive_category_flags.map(f => `<span class="badge warn">⚠ ${esc(f)}</span>`).join("")}
+    </div>
+    <div>${esc(p.category)}${p.subcategory ? " / " + esc(p.subcategory) : ""} — ${esc(p.target_customer)}</div>
+    ${p.assumptions.length ? `<details class="assume"><summary style="cursor:pointer;color:var(--muted)">assumptions made (${p.assumptions.length})</summary><ul>${p.assumptions.map(a => `<li>${esc(a)}</li>`).join("")}</ul></details>` : ""}
+  </div>`;
+
+  html += `<div class="card"><h2>Recommended publishers (${d.publisher_recommendations.length})</h2>`;
+  if (!d.publisher_recommendations.length) {
+    html += `<div style="color:var(--muted)">None — this catalog has no suitable placement for this advertiser.</div>`;
+  }
+  for (const r of d.publisher_recommendations) {
+    html += `<div class="pub">
+      <div class="head"><span class="name">${esc(r.name)}</span>
+        <span class="pct">score ${r.score.toFixed(2)} · ${r.budget_pct}% of budget</span></div>
+      <div class="bar"><i style="width:${r.budget_pct}%"></i></div>
+      <ul class="reasons">${r.fit_reasons.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+    </div>`;
+  }
+  html += `</div>`;
+
+  html += `<div class="card excl"><details><summary>Excluded publishers (${d.excluded_publishers.length})</summary><ul>
+    ${d.excluded_publishers.map(e => `<li><b>${esc(e.name)}</b>: ${esc(e.reason)}</li>`).join("")}
+  </ul></details></div>`;
+
+  html += `<div class="card"><h2>Creative variants (${d.persona_creatives.length})</h2>`;
+  for (const c of d.persona_creatives) {
+    html += `<div class="creative">
+      <div class="persona">${esc(c.name)}</div>
+      <div class="why">${esc(c.why_this_persona)}</div>
+      <div class="headline">“${esc(c.headline)}”</div>
+      <div>${esc(c.body)}</div>
+      <div class="rationale">rationale: ${esc(c.rationale)}</div>
+      ${c.critique_flags.length ? `<div class="badge warn">⚠ ${c.critique_flags.map(esc).join(", ")}</div>` : ""}
+    </div>`;
+  }
+  html += `</div>`;
+
+  const budget = cfg.budget.total_usd
+    ? `total $${cfg.budget.total_usd}`
+    : `percentages only — suggested daily $${cfg.budget.suggested_daily_range_usd[0]}–$${cfg.budget.suggested_daily_range_usd[1]}`;
+  html += `<div class="card"><h2>Campaign config</h2><dl class="kv">
+    <dt>objective</dt><dd>${esc(cfg.objective)}</dd>
+    <dt>targeting mode</dt><dd>${esc(cfg.targeting_mode)}</dd>
+    <dt>budget</dt><dd>${esc(budget)}</dd>
+    <dt>bid strategy</dt><dd>${esc(cfg.bid_strategy.type)} → ${esc(cfg.bid_strategy.upgrade_path)}</dd>
+    <dt>audience</dt><dd>${cfg.audience_attributes.filter(Boolean).map(esc).join(", ")}</dd>
+    <dt>age bands</dt><dd>${(cfg.demographic_filters.age_bands || []).map(esc).join(", ")}</dd>
+    <dt>frequency cap</dt><dd>${cfg.frequency_cap_per_user_per_day}/user/day</dd>
+    <dt>rotation</dt><dd>${esc(cfg.creative_rotation)}</dd>
+  </dl></div>`;
+
+  return html;
+}
+
+async function run() {
+  const brief = $("brief").value.trim();
+  if (!brief) { $("brief").focus(); return; }
+  const budget = parseInt($("budget").value, 10);
+
+  $("run").disabled = true;
+  $("report").style.display = "none";
+  $("report").innerHTML = "";
+  buildTimeline();
+
+  try {
+    const res = await fetch("/api/campaigns", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ brief, budget_usd: Number.isFinite(budget) ? budget : null }),
+    });
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (line.startsWith("data:")) handleEvent(JSON.parse(line.slice(5)));
+      }
+    }
+  } catch (err) {
+    $("report").innerHTML = `<div class="card error">Request failed: ${esc(err.message)}</div>`;
+    $("report").style.display = "block";
+  } finally {
+    $("run").disabled = false;
+  }
+}
+
+function handleEvent(msg) {
+  if (msg.event === "stage_start") {
+    startStage(msg.stage);
+  } else if (msg.event === "stage") {
+    completeStage(msg.stage, msg.data);
+  } else if (msg.event === "done" && msg.result_type === "off_topic") {
+    $("timeline").style.display = "none";
+    $("report").innerHTML = `<div class="card offtopic"><h2>No campaign generated</h2>${esc(msg.data.message)}</div>`;
+    $("report").style.display = "block";
+  } else if (msg.event === "done") {
+    for (const [k] of STAGES) setState(k, "done");
+    $("report").innerHTML = renderDraft(msg.data);
+    $("report").style.display = "block";
+  } else if (msg.event === "error") {
+    $("report").innerHTML = `<div class="card error">Pipeline failed: ${esc(msg.message)}</div>`;
+    $("report").style.display = "block";
+  }
+}
+
+$("run").onclick = run;
+$("brief").addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run();
+});
+</script>
+</body>
+</html>

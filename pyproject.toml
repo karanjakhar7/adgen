@@ -1,0 +1,23 @@
+[project]
+name = "adgen"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.136.3",
+    "litellm>=1.87.1",
+    "pydantic>=2",
+    "python-dotenv>=1.2.2",
+]
+
+[dependency-groups]
+dev = [
+    "fastapi[standard]>=0.136.3",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.15.16",
+]
+
+[tool.vercel]
+entrypoint = "app.api:app"
