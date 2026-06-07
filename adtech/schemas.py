@@ -87,18 +87,18 @@ class Persona(BaseModel):
 
 
 class AdvertiserProfile(BaseModel):
-    category: str
-    subcategory: str | None = None
-    value_props: list[str] = []
-    target_customer: str = ""
-    price_tier: PriceTier = PriceTier.MID
-    purchase_objective: str = "purchase"
-    negative_constraints: list[str] = []
-    implied_audience_gender: Gender = Gender.ANY
-    sensitive_category_flags: list[str] = []
-    assumptions: list[str] = []
-    confidence: Confidence
-    signal: Signal
+    category: str = Field(description="Short product/service category slug", examples=["pet_food", "apparel", "wellness", "home_decor"])
+    subcategory: str | None = Field(None, description="More specific slug if clearly apparent, else null", examples=["senior_dog_food", "activewear", "supplements"])
+    value_props: list[str] = Field(default_factory=list, description="Key selling points stated or strongly implied by the brief")
+    target_customer: str = Field("", description="One phrase describing the ideal customer")
+    price_tier: PriceTier = Field(PriceTier.MID, description="Price positioning inferred from wording or price points")
+    purchase_objective: str = Field("purchase", description="What a campaign should drive", examples=["purchase", "subscription_signup", "lead_gen", "trial", "app_install"])
+    negative_constraints: list[str] = Field(default_factory=list, description="Things the brand explicitly is NOT or avoids")
+    implied_audience_gender: Gender = Field(Gender.ANY, description="Primary gender skew inferred from product or wording")
+    sensitive_category_flags: list[str] = Field(default_factory=list, description="Regulated categories that apply", examples=[["health_claim"], ["finance"], ["children"], ["employment", "housing"]])
+    assumptions: list[str] = Field(default_factory=list, description="Every value inferred rather than read from the brief — surface all guesses here")
+    confidence: Confidence = Field(description="How much was guessed: high = stated outright, medium = reasonable inference, low = mostly assumptions")
+    signal: Signal = Field(description="Input quality gate: clear = actionable brief, low_signal = vague but real business, off_topic = no advertisable business at all")
 
 
 # ---------------------------------------------------------------------------
@@ -121,13 +121,13 @@ class PublisherSignals(BaseModel):
 
 
 class PublisherScore(BaseModel):
-    publisher_id: str
-    score: float = Field(ge=0.0, le=1.0)
-    fit_reasons: list[str]
+    publisher_id: str = Field(description="Publisher ID from the candidate list")
+    score: float = Field(ge=0.0, le=1.0, description="Fit score 0.0–1.0; clustered-low is correct when fit is genuinely poor everywhere")
+    fit_reasons: list[str] = Field(description="2–4 concise reasons citing specific signals, notes, or demographics — no generic praise")
 
 
 class RankOutput(BaseModel):
-    scores: list[PublisherScore]
+    scores: list[PublisherScore] = Field(description="One entry per candidate publisher — every publisher must be scored exactly once")
 
 
 # ---------------------------------------------------------------------------
@@ -136,12 +136,12 @@ class RankOutput(BaseModel):
 
 
 class PersonaChoice(BaseModel):
-    persona_id: str
-    why_this_persona: str
+    persona_id: str = Field(description="Persona ID from the provided catalog")
+    why_this_persona: str = Field(description="1–2 sentences citing a specific affinity, price sensitivity, or publisher audience match")
 
 
 class PersonaSelection(BaseModel):
-    personas: list[PersonaChoice] = Field(min_length=1, max_length=5)
+    personas: list[PersonaChoice] = Field(min_length=1, max_length=5, description="3–5 personas ordered by fit; fewer is acceptable when publisher inventory is narrow")
 
 
 # ---------------------------------------------------------------------------
@@ -150,10 +150,10 @@ class PersonaSelection(BaseModel):
 
 
 class CreativeVariant(BaseModel):
-    persona_id: str
-    headline: str
-    body: str
-    rationale: str
+    persona_id: str = Field(description="The persona ID this creative is written for")
+    headline: str = Field(description="Ad headline, max ~12 words, hooks the persona's core motivation")
+    body: str = Field(description="1–2 sentence body copy built on messaging_preferences, avoiding disinterested_in topics")
+    rationale: str = Field(description="1–2 sentences explaining copy choices relative to this persona's specific preferences")
 
 
 # ---------------------------------------------------------------------------

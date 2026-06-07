@@ -9,14 +9,6 @@ $recommended_publishers
 AVAILABLE PERSONAS (pick from these only, by id):
 $personas_json
 
-Return ONLY a JSON object:
-
-{
-  "personas": [
-    { "persona_id": "persona_001", "why_this_persona": "one or two sentences" }
-  ]
-}
-
 Rules:
 - Pick 3 to 5 personas. If the publisher list is empty or very weak-fit, fewer (even 1) is better than forcing implausible picks.
 - Each persona must cohere with BOTH the advertiser (category affinities, price sensitivity vs price_tier) AND the selected publishers' audiences. Do not pick a convenience-driven bargain hunter for a luxury brand placed on affluent inventory.

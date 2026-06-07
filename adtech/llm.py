@@ -1,14 +1,13 @@
-"""LiteLLM wrapper: per-stage routing, JSON extraction, validate-and-repair loop.
+"""LiteLLM wrapper: per-stage routing, structured output, validate-and-repair loop.
 
-The reliability guarantee for every LLM stage lives here: the model is asked
-for JSON, the output is validated against the stage's Pydantic schema, and on
-failure the validation error is fed back for up to MAX_REPAIR_ATTEMPTS
-retries before the stage fails. Downstream stages never see malformed data.
+The reliability guarantee for every LLM stage lives here: the model is
+constrained to emit JSON via response_format, the output is validated against
+the stage's Pydantic schema, and on failure the validation error is fed back
+for up to MAX_REPAIR_ATTEMPTS retries before the stage fails. Downstream
+stages never see malformed data.
 """
 
-import json
 import logging
-import re
 from string import Template
 from typing import TypeVar
 
@@ -21,8 +20,6 @@ logger = logging.getLogger("adtech")
 
 T = TypeVar("T", bound=BaseModel)
 
-_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
-
 
 def render_prompt(name: str, **slots: str) -> str:
     """Load a prompt template and fill its $placeholders.
@@ -32,18 +29,6 @@ def render_prompt(name: str, **slots: str) -> str:
     """
     template = Template((PROMPTS_DIR / f"{name}.txt").read_text())
     return template.substitute(**slots)
-
-
-def _extract_json(text: str) -> str:
-    """Pull a JSON object out of a model response (fenced or bare)."""
-    match = _FENCE_RE.search(text)
-    if match:
-        return match.group(1)
-    # Fall back to the outermost {...}
-    start, end = text.find("{"), text.rfind("}")
-    if start != -1 and end > start:
-        return text[start : end + 1]
-    return text
 
 
 async def call_llm(stage: str, prompt: str, response_model: type[T]) -> T:
@@ -59,12 +44,12 @@ async def call_llm(stage: str, prompt: str, response_model: type[T]) -> T:
             temperature=temperature,
             timeout=LLM_TIMEOUT_SECONDS,
             num_retries=3,  # transient provider errors (429/5xx) with backoff
+            response_format=response_model,
         )
         raw = response.choices[0].message.content or ""
         try:
-            data = json.loads(_extract_json(raw))
-            return response_model.model_validate(data)
-        except (json.JSONDecodeError, ValidationError) as err:
+            return response_model.model_validate_json(raw)
+        except ValidationError as err:
             last_error = err
             logger.warning("stage=%s attempt=%d validation failed: %s", stage, attempt + 1, err)
             # Repair loop: show the model its own output and the error.
