@@ -312,6 +312,8 @@ Take a look at .env.examples file to get an idea of how LLM is configured and ba
 
 Model routing is config, not code — a stage → (model string, temp) map consumed by `llm.py`:
 
+For this testing POC, both the `fast` and `strong` model classes are configured to the small `gemini/gemini-3.1-flash-lite` model. That is intentional for cost and latency while evaluating the pipeline shape. Some lower-quality recommendations or creative variants should therefore be read as likely to improve with a stronger model, especially for the `strong` class stages (`rank`, `creative`, and `critique`), without requiring code changes.
+
 | Stage | Model class | Temp |
 |-------|-------------|------|
 | Interpret | fast | 0 |

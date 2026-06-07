@@ -26,6 +26,10 @@ uv run fastapi dev app/api.py   # → http://localhost:8000
 
 `POST /api/campaigns` streams SSE stage events; the UI shows each stage live. No root `main.py` — the ASGI app is `app/api.py`. Deploys to Vercel as-is (`vercel deploy`) — set `GEMINI_API_KEY` in project env vars.
 
+## Model quality note
+
+For testing cost and latency, both configured model classes currently point to the small `gemini/gemini-3.1-flash-lite` model. This keeps the POC easy to run, but some weak ranking judgments, persona choices, or ad copy quality may be model-quality limitations rather than pipeline-design limitations. The model routing lives in `.env` / `adtech/config.py`, so using a stronger model for the `strong` class should improve output quality without changing pipeline code.
+
 ## What it is
 
 Six-stage pipeline in `adtech/pipeline.py`:

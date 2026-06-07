@@ -37,6 +37,8 @@ uv run mypy adtech/
 
 LiteLLM is used as the LLM client — see `.env.example` for required env vars. LiteLLM infers the API key from the environment based on the model name string (e.g., `Codex-3-5-haiku-20241022` reads `ANTHROPIC_API_KEY`). Model routing is config, not code — the stage→(model, temperature) map lives in `adtech/config.py`.
 
+For testing, both configured model classes currently use the small `gemini/gemini-3.1-flash-lite` model. This keeps the POC cheaper and faster to run, but weak ranking or creative output may improve by assigning a stronger model to `LLM_MODEL_STRONG` without changing pipeline code.
+
 ## Architecture
 
 The pipeline is defined in `ARCHITECTURE.md` (the authoritative build contract). Key structural decisions:
