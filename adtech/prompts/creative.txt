@@ -9,15 +9,6 @@ $persona_json
 WHY THIS PERSONA WAS CHOSEN:
 $why_this_persona
 
-Return ONLY a JSON object:
-
-{
-  "persona_id": "$persona_id",
-  "headline": "max ~12 words",
-  "body": "1-2 sentences of body copy",
-  "rationale": "1-2 sentences tying your copy choices to this persona's preferences"
-}
-
 Rules:
 - USE the persona's messaging_preferences — they are the voice and claim style this person responds to.
 - RESPECT disinterested_in as hard constraints. If the persona rejects influencer positioning or loud aesthetics, your copy must contain none of it.

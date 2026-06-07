@@ -12,18 +12,6 @@ Signal meanings:
 - gender_alignment: 1.0 aligned, 0.5 partial, 0.0 opposite.
 - income_note: a plain-language flag on price/income mismatch.
 
-Return ONLY a JSON object:
-
-{
-  "scores": [
-    {
-      "publisher_id": "pub_001",
-      "score": 0.0,
-      "fit_reasons": ["2-4 short reasons citing specific signals and notes"]
-    }
-  ]
-}
-
 Rules:
 - Score EVERY candidate publisher exactly once, in [0,1]. Do not skip any.
 - Use BOTH the mechanical signals AND the qualitative "notes". The notes carry directional fit the numbers miss: a publisher whose note says a playful, impulse-driven voice converts best is a TONE CLASH for a premium clinical brand even though the category matches — that direction matters, score it down.
