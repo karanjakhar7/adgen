@@ -21,11 +21,14 @@
              font: inherit; resize: vertical; }
   textarea:focus { outline: none; border-color: var(--accent); }
   .row { display: flex; gap: 10px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
-  input[type=number] { width: 150px; padding: 9px 12px; border-radius: var(--radius);
+  input[type=number] { width: 190px; flex: 0 1 190px; min-width: 190px; padding: 9px 12px; border-radius: var(--radius);
              border: 1px solid var(--border); background: var(--panel); color: var(--text); font: inherit; }
   button.run { padding: 10px 22px; border-radius: var(--radius); border: none; cursor: pointer;
                background: var(--accent); color: #fff; font: inherit; font-weight: 600; }
   button.run:disabled { opacity: .5; cursor: default; }
+  @media (max-width: 520px) {
+    input[type=number] { width: 100%; flex-basis: 100%; min-width: 0; }
+  }
   .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .chip { padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); cursor: pointer;
           background: var(--panel); color: var(--muted); font-size: 13px; }
