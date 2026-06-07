@@ -58,7 +58,14 @@ advertiser text
 
 Turns the free-text one-liner into a normalized `advertiser_profile` **and acts as the input gate**. Output is strict JSON.
 
-Extracts: `category`, `subcategory`, `value_props`, `target_customer`, `price_tier` (budget / mid / premium / luxury), `purchase_objective`, `negative_constraints`, plus three control fields that drive the rest of the pipeline:
+Extracts: `category`, `subcategory`, `value_props`, `target_customer`, `price_tier` (budget / mid / premium / luxury), `purchase_objective`, `negative_constraints`, three **creative-ready** fields that give Stage 5 better raw material, plus three control fields that drive the rest of the pipeline.
+
+Creative-ready fields:
+- `emotional_benefit` — the human payoff under the functional `value_props` ("joint support" → "more pain-free years with a dog who can still climb the stairs"). Copy sells this, not the feature.
+- `proof_points` — the *positive* inventory of credibility claims the brief actually supports ("vet-formulated", "recycled ocean plastic"). Pairs with the "don't invent facts" rule: creative may cite from this list and nothing else.
+- `brand_voice` — the brand's tonal register ("clinical & reassuring", "playful & irreverent"). The on-brand voice that must hold across every persona, so the brand stays recognizable even as the message flexes per audience.
+
+Control fields:
 
 - `signal` — `clear` | `low_signal` | `off_topic`. This is the gate. `off_topic` (e.g. "idk just try it") short-circuits the pipeline with a graceful explanation. `low_signal` (e.g. "we help people feel better") proceeds *with assumptions surfaced* and lowered confidence.
 - `confidence` — `high` | `medium` | `low`. Flows through to `targeting_mode` and budget caution downstream.
@@ -87,17 +94,20 @@ A score **threshold** (not a fixed top-K) decides how many publishers are recomm
 
 ### Stage 4 — Select personas (LLM, fast, temp 0.3)
 
-Picks 3–5 plausible shopper personas, **conditioned on the publishers that actually won** in Stage 3. Ordering matters: personas and publishers share enough category/AOV vocabulary that conditioning persona choice on the winning inventory keeps the pairing coherent — you never generate a "Convenience-First Millennial" ad for a $1,200 handbag that only placed on affluent-classic publishers. Output: persona ids + a `why_this_persona` rationale each.
+Picks 3–5 plausible shopper personas, **conditioned on the publishers that actually won** in Stage 3. Ordering matters: personas and publishers share enough category/AOV vocabulary that conditioning persona choice on the winning inventory keeps the pairing coherent — you never generate a "Convenience-First Millennial" ad for a $1,200 handbag that only placed on affluent-classic publishers.
+
+This stage also acts as **message strategist**. Per pick it outputs: persona id, a `why_this_persona` rationale, a single-minded `message_angle` (the ONE idea that variant leads with), and a `publisher_id` mapping the persona to the placement it best fits. The angles are forced to differ across picks — because Stage 5 fans out independently, naming a distinct angle here is what stops the variants from collapsing into one voice downstream.
 
 ### Stage 5 — Generate creative (LLM, strong, temp 0.8, parallel)
 
-One headline + body + rationale per selected persona. The personas are independent, so this **fans out concurrently** (`asyncio.gather`), which is where parallelism actually buys latency.
+One headline + body + `cta` + rationale per selected persona. The personas are independent, so this **fans out concurrently** (`asyncio.gather`), which is where parallelism actually buys latency.
 
-Each call is conditioned on both sides of the persona record:
-- `messaging_preferences` — the *do* (what voice and claims to use)
-- `disinterested_in` — the *don't* (the negative constraint)
+Each call is conditioned on three things:
+- the persona record — `messaging_preferences` (the *do*: voice and claims to use) and `disinterested_in` (the *don't*: the negative constraint)
+- the `message_angle` assigned in Stage 4 — a hard "lead with exactly this one idea, don't cram value props" instruction
+- the **placement context** — the mapped publisher's AOV, audience, and qualitative `notes`. A top copywriter never writes blind to where the ad runs: the same offer is pitched differently on impulse, late-night Swiftcart (AOV $28) than on considered, affluent Linden Park (AOV $128), and a publisher note like Tailcrate's "playful voice converts best" or Daily Form's "skeptical of unsubstantiated claims" steers tone directly.
 
-The negative constraint is the real differentiator. Telling the model the Affluent Classic rejects "influencer positioning, loud aesthetics" is what stops every variant from collapsing into generic copy.
+Two things stop variants collapsing into generic copy: the negative constraint (telling the model the Affluent Classic rejects "influencer positioning, loud aesthetics") and the distinct per-persona angle. The `cta` is matched to `purchase_objective` (trial → "Start your free trial"; subscription → "Subscribe & save"), and when `sensitive_category_flags` contains `health_claim` the prompt enforces supportive, non-curative phrasing at generation time — the compliance backstop the Stage 5.5 critique stub does not yet provide.
 
 ### Stage 5.5 — Critique pass (LLM, strong, temp 0, optional, batched)
 
@@ -149,6 +159,9 @@ Final output shape (ids are the real catalog ids — `pub_xxx`, `persona_xxx`):
     "subcategory": "senior_dog_food",
     "price_tier": "premium",
     "value_props": ["joint support", "longevity", "vet-formulated"],
+    "emotional_benefit": "more pain-free years with a dog who can still climb the stairs",
+    "proof_points": ["vet-formulated", "grain-free"],
+    "brand_voice": "clinical & reassuring",
     "target_customer": "owners of senior dogs who prioritize health",
     "purchase_objective": "subscription_signup",
     "sensitive_category_flags": ["health_claim"],
@@ -177,8 +190,10 @@ Final output shape (ids are the real catalog ids — `pub_xxx`, `persona_xxx`):
       "persona_id": "persona_004",
       "name": "The Pet Parent",
       "why_this_persona": "reads ingredient labels, pays a premium for pet health",
+      "message_angle": "more good years together",
       "headline": "Built for the dog who built your family",
       "body": "Vet-formulated nutrition for senior dogs — joint support and the kind of ingredient list you actually want to read.",
+      "cta": "Subscribe & save",
       "critique_flags": []
     }
   ],

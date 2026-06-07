@@ -37,8 +37,8 @@ Six-stage pipeline in `adtech/pipeline.py`:
 1. **Interpret** — LLM gate; classifies brief as `clear` / `low_signal` / `off_topic` (off_topic short-circuits immediately)
 2. **Precompute signals** — pure code; AOV fit, category overlap, gender alignment (the model never does arithmetic)
 3. **Rank** — LLM scores every publisher in [0,1]; a threshold (not top-K) decides recommendations; exclusions fall out of the same output
-4. **Select personas** — conditioned on the winning publishers to keep persona/publisher pairing coherent
-5. **Generate creative** — parallel fan-out, one LLM call per persona, steered by `messaging_preferences` and `disinterested_in`
+4. **Select personas** — conditioned on the winning publishers; also assigns each a distinct `message_angle` + placement so the variants don't collapse into one voice
+5. **Generate creative** — parallel fan-out, one LLM call per persona, written for its placement and steered by the assigned angle, `messaging_preferences`, and `disinterested_in`; emits headline + body + `cta`
 6. **Assemble config** — pure code; fit-proportional budget capped by inventory ceilings, exploration floor, exact-100 rounding
 
 Pydantic schemas + a validate-and-repair loop sit between every stage. Full design in `ARCHITECTURE.md`.

@@ -25,6 +25,7 @@ from adtech.schemas import (
     OffTopicResult,
     PersonaCreative,
     PersonaSelection,
+    Publisher,
     PublisherRecommendation,
     RankOutput,
     Signal,
@@ -45,6 +46,36 @@ STAGE_FILES = {
     "draft": "07_draft.json",
     "off_topic": "99_off_topic.json",
 }
+
+
+def _format_placement(pub: "Publisher") -> str:
+    """One publisher rendered as creative-facing placement context."""
+    a = pub.audience
+    dominant = max(a.gender_split, key=lambda g: a.gender_split[g])
+    return (
+        f"- {pub.name} ({pub.category}): AOV ${pub.avg_order_value_usd}, "
+        f"audience {a.age_skew}, {dominant}-leaning, {a.income_tier} income. "
+        f"Notes: {pub.notes}"
+    )
+
+
+def _placement_context(
+    publisher_id: str | None,
+    recommended: list[PublisherRecommendation],
+    pubs_by_id: dict[str, "Publisher"],
+) -> str:
+    """Build the placement block for a creative call.
+
+    Prefer the single publisher the persona was mapped to in Stage 4; fall back
+    to all recommended publishers; degrade gracefully when nothing was matched.
+    """
+    if publisher_id and publisher_id in pubs_by_id:
+        return _format_placement(pubs_by_id[publisher_id])
+    if recommended:
+        return "This persona runs across the recommended inventory:\n" + "\n".join(
+            _format_placement(pubs_by_id[r.publisher_id]) for r in recommended if r.publisher_id in pubs_by_id
+        )
+    return "No specific publisher placement — write for the persona's general shopping context."
 
 
 def _dump_stage(trace_id: str, stage_file: str, payload: Any) -> None:
@@ -188,7 +219,8 @@ async def run_pipeline(
                     advertiser_profile=profile.model_dump_json(indent=2),
                     persona_json=personas_by_id[c.persona_id].model_dump_json(indent=2),
                     why_this_persona=c.why_this_persona,
-                    persona_id=c.persona_id,
+                    message_angle=c.message_angle,
+                    placement_context=_placement_context(c.publisher_id, recommended, pubs_by_id),
                 ),
                 CreativeVariant,
             )
@@ -205,8 +237,10 @@ async def run_pipeline(
             persona_id=c.persona_id,
             name=personas_by_id[c.persona_id].name,
             why_this_persona=c.why_this_persona,
+            message_angle=c.message_angle,
             headline=v.headline,
             body=v.body,
+            cta=v.cta,
             rationale=v.rationale,
             critique_flags=flags.get(c.persona_id, []),
         )
