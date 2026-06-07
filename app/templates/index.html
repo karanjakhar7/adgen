@@ -67,7 +67,11 @@
   .creative:first-of-type { border-top: none; }
   .creative .persona { font-weight: 600; color: var(--accent); }
   .creative .why, .creative .rationale { color: var(--muted); font-size: 13px; }
+  .creative .angle { font-size: 12px; color: var(--accent); text-transform: uppercase;
+                     letter-spacing: .05em; margin: 4px 0 2px; }
   .creative .headline { font-size: 17px; font-weight: 600; margin: 6px 0 2px; }
+  .creative .cta { display: inline-block; margin: 8px 0 2px; padding: 5px 14px; border-radius: var(--radius);
+                   background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; }
   .kv { display: grid; grid-template-columns: 180px 1fr; gap: 6px 14px; font-size: 14px; }
   .kv dt { color: var(--muted); } .kv dd { margin: 0; }
   .excl summary { cursor: pointer; color: var(--muted); }
@@ -213,8 +217,10 @@ function renderDraft(d) {
     html += `<div class="creative">
       <div class="persona">${esc(c.name)}</div>
       <div class="why">${esc(c.why_this_persona)}</div>
+      ${c.message_angle ? `<div class="angle">angle · ${esc(c.message_angle)}</div>` : ""}
       <div class="headline">“${esc(c.headline)}”</div>
       <div>${esc(c.body)}</div>
+      ${c.cta ? `<div class="cta">${esc(c.cta)}</div>` : ""}
       <div class="rationale">rationale: ${esc(c.rationale)}</div>
       ${c.critique_flags.length ? `<div class="badge warn">⚠ ${c.critique_flags.map(esc).join(", ")}</div>` : ""}
     </div>`;

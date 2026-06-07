@@ -50,8 +50,10 @@ def _render_draft(draft: CampaignDraft) -> str:
         lines += [
             f"  ▸ {c.name}",
             f"    why: {c.why_this_persona}",
+            f"    angle: {c.message_angle}",
             f'    headline: "{c.headline}"',
             f"    body: {c.body}",
+            f"    cta: {c.cta}",
             f"    rationale: {c.rationale}",
         ]
         if c.critique_flags:

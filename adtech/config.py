@@ -17,7 +17,7 @@ PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 RUNS_DIR = REPO_ROOT / "runs"
 
 FAST = os.getenv("LLM_MODEL_FAST", "gemini/gemini-3.1-flash-lite")
-STRONG = os.getenv("LLM_MODEL_STRONG", "gemini/gemini-3.1-flash")
+STRONG = os.getenv("LLM_MODEL_STRONG", "gemini/gemini-3.1-flash-lite")
 LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
 
 # stage name → (model string, temperature)

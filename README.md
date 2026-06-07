@@ -26,6 +26,10 @@ uv run fastapi dev app/api.py   # → http://localhost:8000
 
 `POST /api/campaigns` streams SSE stage events; the UI shows each stage live. No root `main.py` — the ASGI app is `app/api.py`. Deploys to Vercel as-is (`vercel deploy`) — set `GEMINI_API_KEY` in project env vars.
 
+## Model quality note
+
+For testing cost and latency, both configured model classes currently point to the small `gemini/gemini-3.1-flash-lite` model. This keeps the POC easy to run, but some weak ranking judgments, persona choices, or ad copy quality may be model-quality limitations rather than pipeline-design limitations. The model routing lives in `.env` / `adtech/config.py`, so using a stronger model for the `strong` class should improve output quality without changing pipeline code.
+
 ## What it is
 
 Six-stage pipeline in `adtech/pipeline.py`:
@@ -33,8 +37,8 @@ Six-stage pipeline in `adtech/pipeline.py`:
 1. **Interpret** — LLM gate; classifies brief as `clear` / `low_signal` / `off_topic` (off_topic short-circuits immediately)
 2. **Precompute signals** — pure code; AOV fit, category overlap, gender alignment (the model never does arithmetic)
 3. **Rank** — LLM scores every publisher in [0,1]; a threshold (not top-K) decides recommendations; exclusions fall out of the same output
-4. **Select personas** — conditioned on the winning publishers to keep persona/publisher pairing coherent
-5. **Generate creative** — parallel fan-out, one LLM call per persona, steered by `messaging_preferences` and `disinterested_in`
+4. **Select personas** — conditioned on the winning publishers; also assigns each a distinct `message_angle` + placement so the variants don't collapse into one voice
+5. **Generate creative** — parallel fan-out, one LLM call per persona, written for its placement and steered by the assigned angle, `messaging_preferences`, and `disinterested_in`; emits headline + body + `cta`
 6. **Assemble config** — pure code; fit-proportional budget capped by inventory ceilings, exploration floor, exact-100 rounding
 
 Pydantic schemas + a validate-and-repair loop sit between every stage. Full design in `ARCHITECTURE.md`.

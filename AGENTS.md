@@ -37,6 +37,8 @@ uv run mypy adtech/
 
 LiteLLM is used as the LLM client — see `.env.example` for required env vars. LiteLLM infers the API key from the environment based on the model name string (e.g., `Codex-3-5-haiku-20241022` reads `ANTHROPIC_API_KEY`). Model routing is config, not code — the stage→(model, temperature) map lives in `adtech/config.py`.
 
+For testing, both configured model classes currently use the small `gemini/gemini-3.1-flash-lite` model. This keeps the POC cheaper and faster to run, but weak ranking or creative output may improve by assigning a stronger model to `LLM_MODEL_STRONG` without changing pipeline code.
+
 ## Architecture
 
 The pipeline is defined in `ARCHITECTURE.md` (the authoritative build contract). Key structural decisions:
@@ -46,8 +48,8 @@ The pipeline is defined in `ARCHITECTURE.md` (the authoritative build contract).
 1. **Interpret** (`adtech/prompts/interpret.txt`) — LLM, temp=0. Parses the advertiser brief into a typed `AdvertiserProfile` with a `signal` field (`clear`/`low_signal`/`off_topic`) that gates the rest of the pipeline.
 2. **Precompute signals** (`adtech/signals.py`) — Pure code. Computes mechanical fit signals (AOV ratio, gender-skew alignment, category overlap) for every publisher candidate. The model never does arithmetic.
 3. **Rank publishers** (`adtech/prompts/rank.txt`) — LLM, temp=0. Uses the precomputed signals + qualitative publisher `notes` to produce a [0,1] score per publisher. A score threshold (not top-K) decides recommendations; below-threshold publishers populate `excluded_publishers`.
-4. **Select personas** (`adtech/prompts/personas.txt`) — LLM, temp=0.3. Conditioned on the *winning publishers* from Stage 3 to keep persona/publisher pairing coherent.
-5. **Generate creative** (`adtech/prompts/creative.txt`) — LLM, temp=0.8. Fans out concurrently via `asyncio.gather`, one call per persona. Each call uses both `messaging_preferences` (do) and `disinterested_in` (don't) from the persona record.
+4. **Select personas** (`adtech/prompts/personas.txt`) — LLM, temp=0.3. Conditioned on the *winning publishers* from Stage 3 to keep persona/publisher pairing coherent. Also acts as message strategist: emits a distinct single-minded `message_angle` and a `publisher_id` placement mapping per pick.
+5. **Generate creative** (`adtech/prompts/creative.txt`) — LLM, temp=0.8. Fans out concurrently via `asyncio.gather`, one call per persona. Each call is conditioned on the persona record (`messaging_preferences` do / `disinterested_in` don't), the assigned `message_angle`, and the **placement context** (the mapped publisher's AOV, audience, and `notes`). Produces headline + body + `cta` (matched to `purchase_objective`); enforces compliant phrasing when `health_claim` is flagged.
 6. **Assemble config** (`adtech/budget.py`) — Pure code. Budget allocation uses fit-proportional shares capped by `monthly_impressions` inventory ceilings, with an exploration floor for lower-ranked publishers.
 
 **Key module responsibilities:**

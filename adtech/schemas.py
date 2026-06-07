@@ -90,6 +90,9 @@ class AdvertiserProfile(BaseModel):
     category: str = Field(description="Short product/service category slug", examples=["pet_food", "apparel", "wellness", "home_decor"])
     subcategory: str | None = Field(None, description="More specific slug if clearly apparent, else null", examples=["senior_dog_food", "activewear", "supplements"])
     value_props: list[str] = Field(default_factory=list, description="Key selling points stated or strongly implied by the brief")
+    emotional_benefit: str = Field("", description="The core human desire/payoff under the functional value props — what the customer actually feels or gains (e.g. 'more pain-free years with a dog who can still climb the stairs')")
+    proof_points: list[str] = Field(default_factory=list, description="Substantiable credibility claims the brief actually supports (e.g. 'vet-formulated', 'recycled ocean plastic', 'clinically studied') — the positive inventory copy may cite; do NOT invent")
+    brand_voice: str = Field("", description="The brand's tonal register inferred from positioning (e.g. 'clinical & reassuring', 'playful & irreverent', 'understated premium') — the on-brand voice creative must hold across every persona")
     target_customer: str = Field("", description="One phrase describing the ideal customer")
     price_tier: PriceTier = Field(PriceTier.MID, description="Price positioning inferred from wording or price points")
     purchase_objective: str = Field("purchase", description="What a campaign should drive", examples=["purchase", "subscription_signup", "lead_gen", "trial", "app_install"])
@@ -138,6 +141,8 @@ class RankOutput(BaseModel):
 class PersonaChoice(BaseModel):
     persona_id: str = Field(description="Persona ID from the provided catalog")
     why_this_persona: str = Field(description="1–2 sentences citing a specific affinity, price sensitivity, or publisher audience match")
+    message_angle: str = Field(description="The ONE single-minded idea this persona's ad should lead with — must be distinct from the other picks' angles so the variants don't collapse into one voice (e.g. 'clinical proof of joint mobility' vs 'more good years together' vs 'vet-trusted, zero guesswork')")
+    publisher_id: str | None = Field(None, description="The recommended publisher whose audience this persona most maps to — used to ground the creative in its placement environment; null if no clear single fit")
 
 
 class PersonaSelection(BaseModel):
@@ -151,9 +156,10 @@ class PersonaSelection(BaseModel):
 
 class CreativeVariant(BaseModel):
     persona_id: str = Field(description="The persona ID this creative is written for")
-    headline: str = Field(description="Ad headline, max ~12 words, hooks the persona's core motivation")
-    body: str = Field(description="1–2 sentence body copy built on messaging_preferences, avoiding disinterested_in topics")
-    rationale: str = Field(description="1–2 sentences explaining copy choices relative to this persona's specific preferences")
+    headline: str = Field(description="Ad headline, max ~12 words, hooks the persona's core motivation on the single assigned message angle")
+    body: str = Field(description="1–2 sentence body copy built on messaging_preferences and one concrete proof point, avoiding disinterested_in topics")
+    cta: str = Field(description="A short, specific call to action matched to the advertiser's purchase_objective (e.g. 'Start your free trial', 'Subscribe & save', 'Shop senior formulas') — low-friction, never generic 'Shop now'")
+    rationale: str = Field(description="1–2 sentences explaining copy choices relative to this persona's specific preferences, the assigned angle, and the placement")
 
 
 # ---------------------------------------------------------------------------
@@ -179,8 +185,10 @@ class PersonaCreative(BaseModel):
     persona_id: str
     name: str
     why_this_persona: str
+    message_angle: str
     headline: str
     body: str
+    cta: str
     rationale: str
     critique_flags: list[str] = []
 
