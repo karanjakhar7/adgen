@@ -37,14 +37,6 @@ uv run python -m app.cli "..." --budget 5000            # include budget allocat
 uv run python -m app.cli "..." --publishers pubs.json --personas personas.json  # custom catalog
 ```
 
-## Deployment
-
-```bash
-vercel deploy
-```
-
-Set `GEMINI_API_KEY` (or your preferred model's key) in the Vercel project environment variables. The app is stateless — no database, no persistent storage — so it deploys as a single serverless function.
-
 ## Configuration
 
 Model routing lives in `.env` and `adtech/config.py`. Both fast and strong model classes default to `gemini/gemini-3.1-flash-lite` for low-cost testing; swap in a stronger model to improve ranking and creative quality without changing any pipeline code.
@@ -120,3 +112,7 @@ uv run pytest
 ```
 
 Per-run artifacts (stage dumps + final result JSON) are written to `runs/<trace_id>/` locally. On Vercel, artifact writes are skipped — the SSE stream carries the full result.
+
+## Deployment
+
+The app is stateless (no database, no persistent storage) and deploys to Vercel. Set your model API key (e.g. `GEMINI_API_KEY`) in the project environment variables.
