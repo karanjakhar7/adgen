@@ -1,76 +1,122 @@
-# adgen — Ad Placement & Creative Generation
+# adgen
 
-An advertiser describes their business in a sentence and supplies their own **publisher
-inventory** and **shopper personas**; the system returns ranked publisher recommendations
-(with reasoning **and** justified exclusions), 3–5 persona-tuned creative variants, and a
-structured campaign config. Bring your own catalog, or start from the bundled sample data.
-Design rationale lives in `ARCHITECTURE.md`; all prompts live in `adtech/prompts/`.
+Generate ranked publisher recommendations, persona-tuned ad creative, and a campaign config from a one-sentence business description. Bring your own publisher inventory and shopper personas, or start from the bundled sample catalog.
 
-**User-supplied catalogs.** Publishers and personas travel in the request (the web UI has a
-structured editor for both, prefilled from the sample catalog and persisted in `localStorage`).
-Only the essentials are required — a publisher needs just a name + category, a persona a name +
-description; every other field is optional and defaults sensibly. When no catalog is supplied,
-the bundled sample data (`data/`) is used so everything runs out-of-the-box.
+**Live demo:** https://adgen-puce.vercel.app
 
-## Run it
+---
 
-Live deployment: https://adgen-puce.vercel.app
+## How it works
+
+1. Describe your business in a sentence or two
+2. Add your publishers (ad networks, newsletters, apps) and shopper personas — or use the sample catalog
+3. Get back: ranked publisher placements with fit reasoning, 3–5 ad creative variants tuned to each persona, and a structured campaign config with budget allocation
+
+Publishers and personas are fully user-supplied. Only a name + category (publisher) or name + description (persona) are required — every other field is optional.
+
+## Quickstart
 
 ```bash
+git clone <repo>
+cd adgen
 uv sync
-cp .env.example .env   # add your GEMINI_API_KEY (any LiteLLM provider works — see .env.example)
-uv run python -m app.cli "We sell premium dog food for senior dogs, targeting owners who care about joint health"
-uv run python -m app.cli "..." --budget 5000 -v                       # optional budget + stage logs
-uv run python -m app.cli "..." --publishers pubs.json --personas personas.json   # bring your own catalog (defaults to sample data)
+cp .env.example .env  # add GEMINI_API_KEY (or any LiteLLM-supported provider)
 ```
 
-Output is a readable terminal report plus run-scoped artifacts in `runs/<trace_id>/` (`result.json` + per-stage dumps). Try the fixtures in `data/example_advertisers.txt` — #15 ("idk just try it") exercises the off-topic gate, #7 (B2B SaaS) the honest zero-fit case.
+**Web UI:**
+```bash
+uv run fastapi dev app/api.py  # → http://localhost:8000
+```
 
-**Web UI** (same pipeline, thin adapter):
+Open the Publishers and Shopper personas sections to customize your catalog, then describe your business and click Generate.
+
+**CLI:**
+```bash
+uv run python -m app.cli "We sell premium running shoes for competitive distance runners. $250 a pair."
+uv run python -m app.cli "..." --budget 5000            # include budget allocation
+uv run python -m app.cli "..." --publishers pubs.json --personas personas.json  # custom catalog
+```
+
+## Deployment
 
 ```bash
-uv run fastapi dev app/api.py   # → http://localhost:8000
+vercel deploy
 ```
 
-Expand **Publishers** / **Shopper personas** to edit the catalog (prefilled from the sample data; "Reset to sample" restores it). `POST /api/campaigns` takes `{brief, budget_usd, publishers, personas}` and streams SSE stage events; `GET /api/sample-catalog` serves the seed data the UI prefills from. No root `main.py` — the ASGI app is `app/api.py`. Deploys to Vercel as-is (`vercel deploy`) — set `GEMINI_API_KEY` in project env vars.
+Set `GEMINI_API_KEY` (or your preferred model's key) in the Vercel project environment variables. The app is stateless — no database, no persistent storage — so it deploys as a single serverless function.
 
-## Model quality note
+## Configuration
 
-For testing cost and latency, both configured model classes currently point to the small `gemini/gemini-3.1-flash-lite` model. This keeps the POC easy to run, but some weak ranking judgments, persona choices, or ad copy quality may be model-quality limitations rather than pipeline-design limitations. The model routing lives in `.env` / `adtech/config.py`, so using a stronger model for the `strong` class should improve output quality without changing pipeline code.
+Model routing lives in `.env` and `adtech/config.py`. Both fast and strong model classes default to `gemini/gemini-3.1-flash-lite` for low-cost testing; swap in a stronger model to improve ranking and creative quality without changing any pipeline code.
 
-## What it is
+```bash
+LLM_MODEL_FAST=claude-haiku-4-5-20251001
+LLM_MODEL_STRONG=claude-sonnet-4-6
+```
 
-Six-stage pipeline in `adtech/pipeline.py`:
+LiteLLM infers the API key from the model name prefix (`claude-` → `ANTHROPIC_API_KEY`, `gemini/` → `GEMINI_API_KEY`, etc.).
 
-1. **Interpret** — LLM gate; classifies brief as `clear` / `low_signal` / `off_topic` (off_topic short-circuits immediately)
-2. **Precompute signals** — pure code; AOV fit, category overlap, gender alignment (the model never does arithmetic)
-3. **Rank** — LLM scores every publisher in [0,1]; a threshold (not top-K) decides recommendations; exclusions fall out of the same output
-4. **Select personas** — conditioned on the winning publishers; also assigns each a distinct `message_angle` + placement so the variants don't collapse into one voice
-5. **Generate creative** — parallel fan-out, one LLM call per persona, written for its placement and steered by the assigned angle, `messaging_preferences`, and `disinterested_in`; emits headline + body + `cta`
-6. **Assemble config** — pure code; fit-proportional budget capped by inventory ceilings, exploration floor, exact-100 rounding
+## Pipeline
 
-Pydantic schemas + a validate-and-repair loop sit between every stage. Full design in `ARCHITECTURE.md`.
+Six stages in `adtech/pipeline.py`:
 
-## With another week
+| Stage | Type | What it does |
+|-------|------|-------------|
+| Interpret | LLM, temp 0 | Parses the brief into a typed profile; gates on `off_topic` input |
+| Precompute signals | Code | AOV fit, category overlap, gender alignment — no LLM arithmetic |
+| Rank publishers | LLM, temp 0 | Scores each publisher 0–1; a threshold (not top-K) decides recommendations |
+| Select personas | LLM, temp 0.3 | Picks personas conditioned on winning publishers; assigns distinct message angles |
+| Generate creative | LLM, temp 0.8 | Parallel fan-out — one call per persona, steered by angle + placement context |
+| Assemble config | Code | Fit-proportional budget allocation, frequency cap, bid strategy |
 
-- **Multi-turn clarification** — for `low_signal` briefs, ask one follow-up instead of guessing
-- **Critique pass** — Stage 5.5 stub is wired; fill it in for repetition, persona drift, unsupported health claims
-- **Eval harness first** — deterministic checks + LLM-vs-category-match-baseline comparison; generative systems look successful long before they're reliable
-- **Caching** — key on `(brief_hash, prompt_version)`; the pipeline is deterministic at temp=0 stages
+Pydantic v2 schemas are the typed contracts between every stage. A validate-and-repair loop feeds schema errors back to the model and retries before failing.
 
-## Intentionally cut
+## API
 
-- **Vector retrieval / embeddings** — a user-supplied catalog fits in context; `retrieve_candidates()` is the designated swap point when catalogs grow large
-- **Database** — catalogs travel per-request (UI persists them in `localStorage`), runs are ephemeral, artifacts are flat files; triggers for each future store are in `ARCHITECTURE.md §11`
-- **Hand-tuned scoring weights** — with 20 rows and zero outcome data, a weighted formula is opinion dressed as arithmetic; code computes raw signals, the LLM weighs them and must explain itself
-- **Auction/bid modeling** — config suggests a manual-CPC start with a stated upgrade path; simulating auctions without outcome data is theater
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/campaigns` | Run the pipeline; streams SSE stage events then the final result |
+| `GET` | `/api/sample-catalog` | Returns the bundled publishers and personas for UI prefill |
+| `GET` | `/api/health` | Health check |
 
-## Hard vs. easy
+`POST /api/campaigns` request shape:
+```json
+{
+  "brief": "string",
+  "budget_usd": 5000,
+  "publishers": [...],
+  "personas": [...]
+}
+```
 
-**Easy:** the happy path — any LLM ranks pet publishers for a dog-food brief and writes decent copy.
+`publishers` and `personas` are optional — the sample catalog is used when omitted.
 
-**Genuinely hard, and where the engineering lives:**
+## Project structure
 
-- **Trustworthy edges** — saying *zero publishers fit* for B2B SaaS instead of force-filling five; flagging that a $1,200 handbag exceeds the catalog's $198 AOV ceiling; surfacing assumptions on vague briefs instead of silently inventing a business
-- **Evaluation** — knowing the ranker beats a dumb baseline instead of trusting fluent rationales
-- **The feedback loop** — once campaigns emit outcomes, allocation/rotation become bandit problems and the ranker becomes calibratable; that's where the interesting work is
+```
+adtech/
+  pipeline.py     six-stage pipeline
+  schemas.py      Pydantic models (the contracts between stages)
+  signals.py      mechanical fit signals (pure code)
+  budget.py       budget allocation (pure code)
+  retrieval.py    catalog loading + normalization
+  llm.py          LiteLLM wrapper + validate-and-repair loop
+  prompts/        prompt templates (one .txt per LLM stage)
+app/
+  api.py          FastAPI app (SSE streaming adapter)
+  cli.py          CLI adapter
+  templates/      web UI (single-file vanilla JS)
+data/
+  publishers.json       sample publisher catalog (~20 entries)
+  shopper_personas.json sample persona catalog (10 entries)
+```
+
+## Development
+
+```bash
+uv run ruff check .
+uv run --with mypy mypy adtech/
+uv run pytest
+```
+
+Per-run artifacts (stage dumps + final result JSON) are written to `runs/<trace_id>/` locally. On Vercel, artifact writes are skipped — the SSE stream carries the full result.
