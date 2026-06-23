@@ -38,8 +38,11 @@ def _category_overlap(profile: AdvertiserProfile, publisher: Publisher) -> float
 
 def _dominant_gender(publisher: Publisher) -> Gender:
     split = publisher.audience.gender_split
+    if not split:
+        return Gender.BALANCED
     top, share = max(split.items(), key=lambda kv: kv[1])
-    if share < 0.55 or top == "other":
+    # Unknown skew label or no clear majority → treat as balanced (neutral).
+    if share < 0.55 or top not in (Gender.FEMALE, Gender.MALE):
         return Gender.BALANCED
     return Gender(top)
 
@@ -57,6 +60,9 @@ def _gender_alignment(profile: AdvertiserProfile, publisher: Publisher) -> float
 
 
 def _aov_signal(profile: AdvertiserProfile, publisher: Publisher) -> tuple[float, str]:
+    # No AOV supplied → neutral signal; don't invent a price-ceiling conflict.
+    if publisher.avg_order_value_usd is None:
+        return 1.0, "unknown"
     lo, hi = PRICE_TIER_AOV_BANDS[profile.price_tier]
     midpoint = (lo + hi) / 2
     ratio = round(publisher.avg_order_value_usd / midpoint, 2)

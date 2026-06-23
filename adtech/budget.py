@@ -39,9 +39,10 @@ def _largest_remainder_round(shares: list[float]) -> list[int]:
 def allocate(scored: list[tuple[str, float, int]]) -> dict[str, int]:
     """Allocate budget percentages across recommended publishers.
 
-    `scored` is [(publisher_id, fit_score, monthly_impressions), ...].
-    Returns {publisher_id: budget_pct} summing to exactly 100 (or {} for zero
-    publishers — the honest zero-recommendation case).
+    `scored` is [(publisher_id, fit_score, monthly_impressions), ...] where
+    monthly_impressions is 0 when unknown (user-supplied publisher without an
+    inventory figure). Returns {publisher_id: budget_pct} summing to exactly
+    100 (or {} for zero publishers — the honest zero-recommendation case).
     """
     if not scored:
         return {}
@@ -49,12 +50,17 @@ def allocate(scored: list[tuple[str, float, int]]) -> dict[str, int]:
         return {scored[0][0]: 100}
 
     total_score = sum(s for _, s, _ in scored) or 1.0
-    total_impressions = sum(i for _, _, i in scored) or 1
+    total_impressions = sum(i for _, _, i in scored)
 
     raw: list[float] = []
     for _, score, impressions in scored:
         fit_share = score / total_score
-        inventory_ceiling = min(impressions / total_impressions, MAX_SINGLE_PUBLISHER_SHARE)
+        # Inventory ceiling only binds when impressions are known; an unknown
+        # (0) figure degrades to pure fit-proportional, capped by the per-pub max.
+        if impressions > 0 and total_impressions > 0:
+            inventory_ceiling = min(impressions / total_impressions, MAX_SINGLE_PUBLISHER_SHARE)
+        else:
+            inventory_ceiling = MAX_SINGLE_PUBLISHER_SHARE
         share = min(fit_share, inventory_ceiling)
         raw.append(max(share, EXPLORATION_FLOOR))
 

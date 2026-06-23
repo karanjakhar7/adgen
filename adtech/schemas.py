@@ -51,34 +51,44 @@ class TargetingMode(StrEnum):
 
 
 class Audience(BaseModel):
-    age_skew: str
-    gender_split: dict[str, float]
-    top_geos: list[str]
-    income_tier: str
+    """Publisher audience. All fields optional with neutral defaults so a
+    user-supplied publisher needn't describe its audience to be usable."""
+
+    age_skew: str = "all"
+    gender_split: dict[str, float] = Field(default_factory=lambda: {"female": 0.5, "male": 0.5})
+    top_geos: list[str] = Field(default_factory=list)
+    income_tier: str = "mid"
 
 
 class Publisher(BaseModel):
-    id: str
+    """A user-supplied publisher. Only `name` + `category` are required;
+    everything else defaults so the entry barrier stays low. `id` is assigned
+    server-side during normalization (see retrieval.normalize_publishers)."""
+
+    id: str = ""
     name: str
     category: str
-    subcategories: list[str]
-    monthly_impressions: int
-    avg_order_value_usd: int
-    audience: Audience
-    notes: str
+    subcategories: list[str] = Field(default_factory=list)
+    monthly_impressions: int | None = None
+    avg_order_value_usd: int | None = None
+    audience: Audience = Field(default_factory=Audience)
+    notes: str = ""
 
 
 class Persona(BaseModel):
-    id: str
+    """A user-supplied shopper persona. Only `name` + `description` are
+    required. `id` is assigned server-side during normalization."""
+
+    id: str = ""
     name: str
-    age_range: str
-    gender_skew: str
     description: str
-    category_affinities: list[str]
-    price_sensitivity: str
-    messaging_preferences: list[str]
-    disinterested_in: list[str]
-    typical_aov_usd: int
+    age_range: str = "any"
+    gender_skew: str = "any"
+    category_affinities: list[str] = Field(default_factory=list)
+    price_sensitivity: str = "medium"
+    messaging_preferences: list[str] = Field(default_factory=list)
+    disinterested_in: list[str] = Field(default_factory=list)
+    typical_aov_usd: int | None = None
 
 
 # ---------------------------------------------------------------------------

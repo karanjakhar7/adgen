@@ -24,7 +24,13 @@ from pydantic import BaseModel
 from adtech.artifacts import write_result
 from adtech.logging import configure_logging
 from adtech.pipeline import run_pipeline
-from adtech.schemas import OffTopicResult
+from adtech.retrieval import (
+    load_personas,
+    load_publishers,
+    normalize_personas,
+    normalize_publishers,
+)
+from adtech.schemas import OffTopicResult, Persona, Publisher
 
 configure_logging(default_level="INFO")
 logger = logging.getLogger("adtech")
@@ -39,6 +45,9 @@ app = FastAPI(title="adgen", description="Ad placement & creative generation POC
 class CampaignRequest(BaseModel):
     brief: str
     budget_usd: int | None = None
+    # User-supplied catalogs; when omitted the bundled sample catalog is used.
+    publishers: list[Publisher] | None = None
+    personas: list[Persona] | None = None
 
 
 def _to_jsonable(obj: object) -> str:
@@ -48,6 +57,13 @@ def _to_jsonable(obj: object) -> str:
 @app.get("/api/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/sample-catalog")
+async def sample_catalog() -> dict[str, list]:
+    """The bundled sample publishers/personas — the frontend prefills its
+    catalog editors from this so the tool works out-of-the-box."""
+    return {"publishers": load_publishers(), "personas": load_personas()}
 
 
 @app.post("/api/campaigns")
@@ -64,10 +80,18 @@ async def create_campaign(req: CampaignRequest) -> StreamingResponse:
         if key not in ("draft", "off_topic"):
             queue.put_nowait({"event": "stage", "stage": key, "data": payload})
 
+    publishers = normalize_publishers(req.publishers) if req.publishers else None
+    personas = normalize_personas(req.personas) if req.personas else None
+
     async def runner() -> None:
         try:
             result = await run_pipeline(
-                req.brief, total_budget_usd=req.budget_usd, trace=not ON_VERCEL, on_event=on_event
+                req.brief,
+                total_budget_usd=req.budget_usd,
+                trace=not ON_VERCEL,
+                on_event=on_event,
+                publishers=publishers,
+                personas=personas,
             )
             if not ON_VERCEL:
                 write_result(result)

@@ -19,20 +19,50 @@
   textarea { width: 100%; min-height: 84px; padding: 12px 14px; border-radius: var(--radius);
              border: 1px solid var(--border); background: var(--panel); color: var(--text);
              font: inherit; resize: vertical; }
-  textarea:focus { outline: none; border-color: var(--accent); }
+  textarea:focus, input:focus, select:focus { outline: none; border-color: var(--accent); }
   .row { display: flex; gap: 10px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
-  input[type=number] { width: 190px; flex: 0 1 190px; min-width: 190px; padding: 9px 12px; border-radius: var(--radius);
+  input[type=number], input[type=text], select { padding: 9px 12px; border-radius: var(--radius);
              border: 1px solid var(--border); background: var(--panel); color: var(--text); font: inherit; }
+  #budget { width: 190px; flex: 0 1 190px; min-width: 190px; }
   button.run { padding: 10px 22px; border-radius: var(--radius); border: none; cursor: pointer;
                background: var(--accent); color: #fff; font: inherit; font-weight: 600; }
   button.run:disabled { opacity: .5; cursor: default; }
   @media (max-width: 520px) {
-    input[type=number] { width: 100%; flex-basis: 100%; min-width: 0; }
+    #budget { width: 100%; flex-basis: 100%; min-width: 0; }
   }
   .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .chip { padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); cursor: pointer;
           background: var(--panel); color: var(--muted); font-size: 13px; }
   .chip:hover { color: var(--text); border-color: var(--accent); }
+
+  /* ---- catalog editors ---- */
+  .catalog { margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius);
+             background: var(--panel); }
+  .catalog > summary { cursor: pointer; padding: 12px 16px; color: var(--text); font-weight: 600;
+                       list-style: none; display: flex; align-items: center; gap: 8px; }
+  .catalog > summary::-webkit-details-marker { display: none; }
+  .catalog > summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
+  .catalog[open] > summary::before { transform: rotate(90deg); }
+  .catalog > summary .count { color: var(--muted); font-weight: 400; font-size: 13px; }
+  .catalog .body { padding: 0 16px 16px; }
+  .cat-actions { display: flex; gap: 8px; margin: 4px 0 14px; flex-wrap: wrap; }
+  .btn-sm { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;
+            background: var(--panel2); color: var(--text); font: inherit; font-size: 13px; }
+  .btn-sm:hover { border-color: var(--accent); }
+  .entry { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 10px;
+           background: var(--bg); }
+  .entry .top { display: flex; gap: 8px; align-items: center; }
+  .entry .top input { flex: 1 1 auto; min-width: 0; }
+  .entry .rm { flex: none; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border);
+               background: var(--panel2); color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; }
+  .entry .rm:hover { color: var(--bad); border-color: var(--bad); }
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin-top: 8px; }
+  .fields .full { grid-column: 1 / -1; }
+  .fields label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+  .fields input, .fields select, .fields textarea { font-size: 14px; }
+  .fields textarea { min-height: 40px; }
+  .adv > summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 8px; }
+  @media (max-width: 520px) { .fields { grid-template-columns: 1fr; } }
 
   .timeline { margin: 28px 0 0; display: none; }
   .step { display: flex; gap: 12px; padding: 8px 0; align-items: baseline; }
@@ -88,7 +118,7 @@
 <body>
 <div class="wrap">
   <h1>adgen</h1>
-  <p class="sub">Describe your business in a sentence — get ranked publishers, persona-tuned creative, and a campaign config.</p>
+  <p class="sub">Describe a business, bring your own publishers &amp; shopper personas — get ranked placements, persona-tuned creative, and a campaign config.</p>
 
   <textarea id="brief" placeholder='e.g. "We sell premium dog food for senior dogs, targeting owners who care about joint health."'></textarea>
   <div class="row">
@@ -96,6 +126,30 @@
     <button class="run" id="run">Generate campaign</button>
   </div>
   <div class="chips" id="chips"></div>
+
+  <!-- Publishers catalog editor -->
+  <details class="catalog" id="cat-pub">
+    <summary>Publishers <span class="count" id="pub-count"></span></summary>
+    <div class="body">
+      <div class="cat-actions">
+        <button class="btn-sm" id="pub-add" type="button">+ Add publisher</button>
+        <button class="btn-sm" id="pub-reset" type="button">Reset to sample</button>
+      </div>
+      <div id="pub-list"></div>
+    </div>
+  </details>
+
+  <!-- Personas catalog editor -->
+  <details class="catalog" id="cat-persona">
+    <summary>Shopper personas <span class="count" id="persona-count"></span></summary>
+    <div class="body">
+      <div class="cat-actions">
+        <button class="btn-sm" id="persona-add" type="button">+ Add persona</button>
+        <button class="btn-sm" id="persona-reset" type="button">Reset to sample</button>
+      </div>
+      <div id="persona-list"></div>
+    </div>
+  </details>
 
   <div class="timeline" id="timeline"></div>
   <div class="report" id="report"></div>
@@ -119,8 +173,26 @@ const STAGES = [
   ["config",     "6 · Assemble config"],
 ];
 
+const STORE_KEY = "adgen_catalog_v1";
+
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const toList = (s) => String(s ?? "").split(",").map(x => x.trim()).filter(Boolean);
+const fromList = (a) => Array.isArray(a) ? a.join(", ") : "";
+
+// map a friendly "gender skew" choice <-> a gender_split dict
+function genderToSplit(g) {
+  if (g === "female") return { female: 0.7, male: 0.29, other: 0.01 };
+  if (g === "male")   return { female: 0.29, male: 0.7, other: 0.01 };
+  return { female: 0.5, male: 0.5 };
+}
+function splitToGender(split) {
+  if (!split || typeof split !== "object") return "balanced";
+  let top = null, share = 0;
+  for (const [k, v] of Object.entries(split)) if (v > share) { share = v; top = k; }
+  if (share >= 0.55 && (top === "female" || top === "male")) return top;
+  return "balanced";
+}
 
 // example chips
 for (const ex of EXAMPLES) {
@@ -130,6 +202,199 @@ for (const ex of EXAMPLES) {
   c.onclick = () => { $("brief").value = ex; };
   $("chips").appendChild(c);
 }
+
+/* ---------------- catalog editors ---------------- */
+
+function publisherCard(p = {}) {
+  const el = document.createElement("div");
+  el.className = "entry pub-entry";
+  el.innerHTML = `
+    <div class="top">
+      <input data-f="name" type="text" placeholder="Publisher name *" value="${esc(p.name)}">
+      <input data-f="category" type="text" placeholder="Category *" value="${esc(p.category)}">
+      <button class="rm" type="button" title="Remove">×</button>
+    </div>
+    <div class="fields">
+      <label class="full">Notes
+        <textarea data-f="notes" placeholder="Qualitative context the ranker should weigh">${esc(p.notes)}</textarea></label>
+    </div>
+    <details class="adv"><summary>advanced</summary>
+      <div class="fields">
+        <label class="full">Subcategories (comma-separated)
+          <input data-f="subcategories" type="text" value="${esc(fromList(p.subcategories))}"></label>
+        <label>Avg order value (USD)
+          <input data-f="avg_order_value_usd" type="number" min="0" value="${p.avg_order_value_usd ?? ""}"></label>
+        <label>Monthly impressions
+          <input data-f="monthly_impressions" type="number" min="0" value="${p.monthly_impressions ?? ""}"></label>
+        <label>Audience age
+          <input data-f="age_skew" type="text" placeholder="e.g. 18-34" value="${esc(p.audience?.age_skew && p.audience.age_skew !== "all" ? p.audience.age_skew : "")}"></label>
+        <label>Gender skew
+          <select data-f="gender">
+            <option value="balanced">balanced</option>
+            <option value="female">female</option>
+            <option value="male">male</option>
+          </select></label>
+        <label>Income tier
+          <select data-f="income_tier">
+            <option value="mid">mid</option>
+            <option value="low">low</option>
+            <option value="high">high</option>
+          </select></label>
+      </div>
+    </details>`;
+  el.querySelector('[data-f="gender"]').value = splitToGender(p.audience?.gender_split);
+  if (p.audience?.income_tier) el.querySelector('[data-f="income_tier"]').value = p.audience.income_tier;
+  el.querySelector(".rm").onclick = () => { el.remove(); afterChange("pub"); };
+  return el;
+}
+
+function personaCard(p = {}) {
+  const el = document.createElement("div");
+  el.className = "entry persona-entry";
+  el.innerHTML = `
+    <div class="top">
+      <input data-f="name" type="text" placeholder="Persona name *" value="${esc(p.name)}">
+      <button class="rm" type="button" title="Remove">×</button>
+    </div>
+    <div class="fields">
+      <label class="full">Description *
+        <textarea data-f="description" placeholder="Who they are and what drives their shopping">${esc(p.description)}</textarea></label>
+    </div>
+    <details class="adv"><summary>advanced</summary>
+      <div class="fields">
+        <label class="full">Category affinities (comma-separated)
+          <input data-f="category_affinities" type="text" value="${esc(fromList(p.category_affinities))}"></label>
+        <label class="full">Messaging preferences (comma-separated)
+          <input data-f="messaging_preferences" type="text" value="${esc(fromList(p.messaging_preferences))}"></label>
+        <label class="full">Disinterested in (comma-separated)
+          <input data-f="disinterested_in" type="text" value="${esc(fromList(p.disinterested_in))}"></label>
+        <label>Price sensitivity
+          <select data-f="price_sensitivity">
+            <option value="medium">medium</option>
+            <option value="low">low</option>
+            <option value="high">high</option>
+          </select></label>
+        <label>Typical order value (USD)
+          <input data-f="typical_aov_usd" type="number" min="0" value="${p.typical_aov_usd ?? ""}"></label>
+        <label>Age range
+          <input data-f="age_range" type="text" placeholder="e.g. 28-40" value="${esc(p.age_range && p.age_range !== "any" ? p.age_range : "")}"></label>
+        <label>Gender skew
+          <select data-f="gender_skew">
+            <option value="any">any</option>
+            <option value="female">female</option>
+            <option value="male">male</option>
+          </select></label>
+      </div>
+    </details>`;
+  if (p.price_sensitivity) el.querySelector('[data-f="price_sensitivity"]').value = p.price_sensitivity;
+  if (p.gender_skew) el.querySelector('[data-f="gender_skew"]').value = p.gender_skew;
+  el.querySelector(".rm").onclick = () => { el.remove(); afterChange("persona"); };
+  return el;
+}
+
+function collectPublishers() {
+  return [...$("pub-list").querySelectorAll(".pub-entry")].map(el => {
+    const g = (f) => el.querySelector(`[data-f="${f}"]`);
+    const num = (f) => { const v = g(f).value.trim(); return v === "" ? null : Number(v); };
+    const age = g("age_skew").value.trim();
+    return {
+      name: g("name").value.trim(),
+      category: g("category").value.trim(),
+      notes: g("notes").value.trim(),
+      subcategories: toList(g("subcategories").value),
+      avg_order_value_usd: num("avg_order_value_usd"),
+      monthly_impressions: num("monthly_impressions"),
+      audience: {
+        age_skew: age || "all",
+        gender_split: genderToSplit(g("gender").value),
+        income_tier: g("income_tier").value,
+      },
+    };
+  });
+}
+
+function collectPersonas() {
+  return [...$("persona-list").querySelectorAll(".persona-entry")].map(el => {
+    const g = (f) => el.querySelector(`[data-f="${f}"]`);
+    const aov = g("typical_aov_usd").value.trim();
+    const age = g("age_range").value.trim();
+    return {
+      name: g("name").value.trim(),
+      description: g("description").value.trim(),
+      category_affinities: toList(g("category_affinities").value),
+      messaging_preferences: toList(g("messaging_preferences").value),
+      disinterested_in: toList(g("disinterested_in").value),
+      price_sensitivity: g("price_sensitivity").value,
+      typical_aov_usd: aov === "" ? null : Number(aov),
+      age_range: age || "any",
+      gender_skew: g("gender_skew").value,
+    };
+  });
+}
+
+function updateCounts() {
+  $("pub-count").textContent = `(${$("pub-list").querySelectorAll(".pub-entry").length})`;
+  $("persona-count").textContent = `(${$("persona-list").querySelectorAll(".persona-entry").length})`;
+}
+
+function persist() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify({
+      publishers: collectPublishers(), personas: collectPersonas(),
+    }));
+  } catch (_) { /* storage may be unavailable; non-fatal */ }
+}
+
+// debounced save + count refresh after any edit or add/remove
+let saveTimer;
+function afterChange() {
+  updateCounts();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(persist, 300);
+}
+
+function renderCatalog(publishers, personas) {
+  const pl = $("pub-list"), ql = $("persona-list");
+  pl.innerHTML = ""; ql.innerHTML = "";
+  for (const p of publishers) pl.appendChild(publisherCard(p));
+  for (const p of personas) ql.appendChild(personaCard(p));
+  updateCounts();
+}
+
+let SAMPLE = { publishers: [], personas: [] };
+
+async function initCatalog() {
+  try {
+    const res = await fetch("/api/sample-catalog");
+    if (res.ok) SAMPLE = await res.json();
+  } catch (_) { /* offline / not available — start empty */ }
+
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); } catch (_) {}
+  if (saved && (saved.publishers?.length || saved.personas?.length)) {
+    renderCatalog(saved.publishers || [], saved.personas || []);
+  } else {
+    renderCatalog(SAMPLE.publishers || [], SAMPLE.personas || []);
+  }
+}
+
+// wire catalog buttons + input persistence (event delegation)
+$("pub-add").onclick = () => { $("cat-pub").open = true; $("pub-list").appendChild(publisherCard()); afterChange(); };
+$("persona-add").onclick = () => { $("cat-persona").open = true; $("persona-list").appendChild(personaCard()); afterChange(); };
+$("pub-reset").onclick = () => {
+  $("pub-list").innerHTML = "";
+  for (const p of (SAMPLE.publishers || [])) $("pub-list").appendChild(publisherCard(p));
+  afterChange();
+};
+$("persona-reset").onclick = () => {
+  $("persona-list").innerHTML = "";
+  for (const p of (SAMPLE.personas || [])) $("persona-list").appendChild(personaCard(p));
+  afterChange();
+};
+$("pub-list").addEventListener("input", afterChange);
+$("persona-list").addEventListener("input", afterChange);
+
+/* ---------------- pipeline run + rendering ---------------- */
 
 function stageNote(stage, data) {
   switch (stage) {
@@ -247,10 +512,21 @@ function renderDraft(d) {
   return html;
 }
 
+function showError(msg) {
+  $("timeline").style.display = "none";
+  $("report").innerHTML = `<div class="card error">${esc(msg)}</div>`;
+  $("report").style.display = "block";
+}
+
 async function run() {
   const brief = $("brief").value.trim();
   if (!brief) { $("brief").focus(); return; }
   const budget = parseInt($("budget").value, 10);
+
+  const publishers = collectPublishers().filter(p => p.name && p.category);
+  const personas = collectPersonas().filter(p => p.name && p.description);
+  if (!publishers.length) { $("cat-pub").open = true; showError("Add at least one publisher (name + category required)."); return; }
+  if (!personas.length) { $("cat-persona").open = true; showError("Add at least one shopper persona (name + description required)."); return; }
 
   $("run").disabled = true;
   $("report").style.display = "none";
@@ -261,9 +537,23 @@ async function run() {
     const res = await fetch("/api/campaigns", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ brief, budget_usd: Number.isFinite(budget) ? budget : null }),
+      body: JSON.stringify({
+        brief,
+        budget_usd: Number.isFinite(budget) ? budget : null,
+        publishers,
+        personas,
+      }),
     });
-    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok || !res.body) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        if (body && body.detail) detail = typeof body.detail === "string"
+          ? body.detail
+          : body.detail.map(e => `${(e.loc || []).slice(1).join(".")}: ${e.msg}`).join("; ");
+      } catch (_) {}
+      throw new Error(detail);
+    }
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -280,8 +570,7 @@ async function run() {
       }
     }
   } catch (err) {
-    $("report").innerHTML = `<div class="card error">Request failed: ${esc(err.message)}</div>`;
-    $("report").style.display = "block";
+    showError(`Request failed: ${err.message}`);
   } finally {
     $("run").disabled = false;
   }
@@ -310,6 +599,8 @@ $("run").onclick = run;
 $("brief").addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run();
 });
+
+initCatalog();
 </script>
 </body>
 </html>

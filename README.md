@@ -1,9 +1,16 @@
-# adgen — Ad Placement & Creative Generation POC
+# adgen — Ad Placement & Creative Generation
 
-An advertiser describes their business in a sentence; the system returns ranked publisher
-recommendations (with reasoning **and** justified exclusions), 3–5 persona-tuned creative
-variants, and a structured campaign config. Design rationale lives in `ARCHITECTURE.md`;
-all prompts live in `adtech/prompts/`.
+An advertiser describes their business in a sentence and supplies their own **publisher
+inventory** and **shopper personas**; the system returns ranked publisher recommendations
+(with reasoning **and** justified exclusions), 3–5 persona-tuned creative variants, and a
+structured campaign config. Bring your own catalog, or start from the bundled sample data.
+Design rationale lives in `ARCHITECTURE.md`; all prompts live in `adtech/prompts/`.
+
+**User-supplied catalogs.** Publishers and personas travel in the request (the web UI has a
+structured editor for both, prefilled from the sample catalog and persisted in `localStorage`).
+Only the essentials are required — a publisher needs just a name + category, a persona a name +
+description; every other field is optional and defaults sensibly. When no catalog is supplied,
+the bundled sample data (`data/`) is used so everything runs out-of-the-box.
 
 ## Run it
 
@@ -13,7 +20,8 @@ Live deployment: https://adgen-puce.vercel.app
 uv sync
 cp .env.example .env   # add your GEMINI_API_KEY (any LiteLLM provider works — see .env.example)
 uv run python -m app.cli "We sell premium dog food for senior dogs, targeting owners who care about joint health"
-uv run python -m app.cli "..." --budget 5000 -v   # optional budget + stage logs
+uv run python -m app.cli "..." --budget 5000 -v                       # optional budget + stage logs
+uv run python -m app.cli "..." --publishers pubs.json --personas personas.json   # bring your own catalog (defaults to sample data)
 ```
 
 Output is a readable terminal report plus run-scoped artifacts in `runs/<trace_id>/` (`result.json` + per-stage dumps). Try the fixtures in `data/example_advertisers.txt` — #15 ("idk just try it") exercises the off-topic gate, #7 (B2B SaaS) the honest zero-fit case.
@@ -24,7 +32,7 @@ Output is a readable terminal report plus run-scoped artifacts in `runs/<trace_i
 uv run fastapi dev app/api.py   # → http://localhost:8000
 ```
 
-`POST /api/campaigns` streams SSE stage events; the UI shows each stage live. No root `main.py` — the ASGI app is `app/api.py`. Deploys to Vercel as-is (`vercel deploy`) — set `GEMINI_API_KEY` in project env vars.
+Expand **Publishers** / **Shopper personas** to edit the catalog (prefilled from the sample data; "Reset to sample" restores it). `POST /api/campaigns` takes `{brief, budget_usd, publishers, personas}` and streams SSE stage events; `GET /api/sample-catalog` serves the seed data the UI prefills from. No root `main.py` — the ASGI app is `app/api.py`. Deploys to Vercel as-is (`vercel deploy`) — set `GEMINI_API_KEY` in project env vars.
 
 ## Model quality note
 
@@ -52,8 +60,8 @@ Pydantic schemas + a validate-and-repair loop sit between every stage. Full desi
 
 ## Intentionally cut
 
-- **Vector retrieval / embeddings** — 20 publishers fit in context; `retrieve_candidates()` is the designated swap point when the catalog grows
-- **Database** — static data in memory, runs are ephemeral, artifacts are flat files; triggers for each future store are in `ARCHITECTURE.md §11`
+- **Vector retrieval / embeddings** — a user-supplied catalog fits in context; `retrieve_candidates()` is the designated swap point when catalogs grow large
+- **Database** — catalogs travel per-request (UI persists them in `localStorage`), runs are ephemeral, artifacts are flat files; triggers for each future store are in `ARCHITECTURE.md §11`
 - **Hand-tuned scoring weights** — with 20 rows and zero outcome data, a weighted formula is opinion dressed as arithmetic; code computes raw signals, the LLM weighs them and must explain itself
 - **Auction/bid modeling** — config suggests a manual-CPC start with a stated upgrade path; simulating auctions without outcome data is theater
 

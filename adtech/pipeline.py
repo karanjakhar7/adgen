@@ -23,6 +23,7 @@ from adtech.schemas import (
     CreativeVariant,
     ExcludedPublisher,
     OffTopicResult,
+    Persona,
     PersonaCreative,
     PersonaSelection,
     Publisher,
@@ -94,12 +95,18 @@ async def run_pipeline(
     total_budget_usd: int | None = None,
     trace: bool = True,
     on_event: Callable[[str, Any], None] | None = None,
+    publishers: list[Publisher] | None = None,
+    personas: list[Persona] | None = None,
 ) -> CampaignDraft | OffTopicResult:
     """Run the six-stage pipeline.
 
     `on_event(key, payload)` fires when visible stages start and when they
     complete (completion keys per STAGE_FILES) — the hook interfaces (API
     streaming, progress UIs) attach here without touching stage logic.
+
+    `publishers`/`personas`, when provided, are the user-supplied catalog
+    (ids already normalized by the caller); otherwise the bundled sample
+    catalog is used so the pipeline still runs out-of-the-box.
     """
     trace_id = uuid.uuid4().hex[:12]
     log = logging.LoggerAdapter(logger, {"trace_id": trace_id})
@@ -139,7 +146,7 @@ async def run_pipeline(
     # ---- Stage 2: precompute mechanical signals (code) --------------------
     log.info("stage 2: signals")
     emit_start("signals")
-    candidates = retrieve_candidates(profile)
+    candidates = publishers if publishers else retrieve_candidates(profile)
     signals_by_id = {p.id: compute_signals(profile, p) for p in candidates}
     emit("signals", {pid: s for pid, s in signals_by_id.items()})
 
@@ -166,7 +173,7 @@ async def run_pipeline(
     losers = [s for s in scored if s not in winners]
 
     allocation = budget.allocate(
-        [(s.publisher_id, s.score, pubs_by_id[s.publisher_id].monthly_impressions) for s in winners]
+        [(s.publisher_id, s.score, pubs_by_id[s.publisher_id].monthly_impressions or 0) for s in winners]
     )
     recommended = [
         PublisherRecommendation(
@@ -192,7 +199,7 @@ async def run_pipeline(
     # ---- Stage 4: select personas, conditioned on the winners --------------
     log.info("stage 4: personas")
     emit_start("personas")
-    all_personas = load_personas()
+    all_personas = personas if personas else load_personas()
     personas_by_id = {p.id: p for p in all_personas}
     selection = await call_llm(
         "personas",

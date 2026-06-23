@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **working prototype** (POC) for an ad placement & creative generation system. An advertiser submits a one-to-two sentence business description; the system returns ranked publisher recommendations, 3–5 persona-tuned ad creative variants, and a structured campaign config.
+This is a **general-purpose** ad placement & creative generation system. An advertiser submits a one-to-two sentence business description **plus their own publisher inventory and shopper personas**; the system returns ranked publisher recommendations, 3–5 persona-tuned ad creative variants, and a structured campaign config. When no catalog is supplied, the bundled sample data (`data/`) is used as a fallback so it runs out-of-the-box.
+
+**User-supplied catalogs:** Publishers/personas travel in the request body — `run_pipeline(..., publishers=, personas=)` and `CampaignRequest.publishers/personas`. The web UI has a structured editor for both (prefilled from `GET /api/sample-catalog`, persisted in `localStorage`). The schema is relaxed: only `name`+`category` (publisher) / `name`+`description` (persona) are required; every other field is optional with a neutral default, and `signals.py`/`budget.py` degrade gracefully when a field is missing. Server-side normalization (`retrieval.normalize_publishers`/`normalize_personas`) assigns clean ids (`pub_001…`) regardless of client input.
 
 The pipeline (`adtech/`), CLI (`app/cli.py`), and streaming web UI (`app/api.py` + `app/templates/`) are built per the spec in `ARCHITECTURE.md`. The ASGI app lives in `app/api.py`; there is no root `main.py`. Remaining stubs: `adtech/critique.py` (Stage 5.5) and `evals/`.
 
@@ -66,7 +68,7 @@ The pipeline is defined in `ARCHITECTURE.md` (the authoritative build contract).
 
 ## Data
 
-Static reference data lives in `data/` and is loaded into typed in-memory objects at startup:
+The `data/` files are now **sample/seed data** — the default catalog used when the caller supplies none, and the source the web UI prefills its editor from (`GET /api/sample-catalog`). They are loaded into typed in-memory objects (LRU-cached):
 
 - `publishers.json` — ~20 publishers with demographics, AOV, `monthly_impressions`, and qualitative `notes`
 - `shopper_personas.json` — 10 personas with `messaging_preferences` and `disinterested_in`

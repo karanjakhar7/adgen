@@ -1,4 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "fastapi"
+  "framework": "fastapi",
+  "functions": {
+    "app/api.py": { "maxDuration": 60 }
+  }
 }

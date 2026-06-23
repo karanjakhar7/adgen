@@ -1,8 +1,10 @@
-# Ad Placement & Creative Generation — Architecture Spec (POC)
+# Ad Placement & Creative Generation — Architecture Spec
 
-**Status:** draft v1 · **Scope:** working prototype with a clean path to production
+**Status:** draft v1 · **Scope:** general-purpose tool with a clean path to production
 
-An advertiser types one or two sentences about their business. The system returns a ranked list of recommended publishers (with reasoning and justified exclusions), 3–5 persona-tuned creative variants, and a structured campaign config ready for human review or a downstream system to launch.
+An advertiser types one or two sentences about their business and supplies their own publisher inventory and shopper personas. The system returns a ranked list of recommended publishers (with reasoning and justified exclusions), 3–5 persona-tuned creative variants, and a structured campaign config ready for human review or a downstream system to launch.
+
+> **Generalization note (post-v1).** Catalogs are now **user-supplied**, travelling in the request body (`run_pipeline(..., publishers=, personas=)`; `CampaignRequest.publishers/personas`; structured editor in the web UI). The `data/` files described below are the **sample/seed catalog**: the fallback when none is supplied, and the source the UI prefills from (`GET /api/sample-catalog`). The record schemas are relaxed so only `name`+`category` (publisher) / `name`+`description` (persona) are required — all other fields are optional with neutral defaults, and the code stages degrade gracefully. The rest of this spec (stages, what's code vs. model, the seams) is unchanged.
 
 This document is the build contract: what each stage does, what is code vs. model, the data shapes, how edge cases are handled, how we measure quality, and where the production seams are.
 

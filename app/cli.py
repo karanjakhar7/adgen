@@ -6,13 +6,15 @@ Usage:
 
 import argparse
 import asyncio
+import json
 import sys
 from pathlib import Path
 
 from adtech.artifacts import write_result
 from adtech.logging import configure_logging
 from adtech.pipeline import run_pipeline
-from adtech.schemas import CampaignDraft, OffTopicResult
+from adtech.retrieval import normalize_personas, normalize_publishers
+from adtech.schemas import CampaignDraft, OffTopicResult, Persona, Publisher
 
 RULE = "─" * 72
 
@@ -89,6 +91,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate a draft ad campaign from a one-line business description.")
     parser.add_argument("brief", help="the advertiser's business description")
     parser.add_argument("--budget", type=int, default=None, help="total budget in USD (optional)")
+    parser.add_argument("--publishers", type=Path, default=None, help="path to a publishers JSON file (default: bundled sample catalog)")
+    parser.add_argument("--personas", type=Path, default=None, help="path to a shopper-personas JSON file (default: bundled sample catalog)")
     parser.add_argument("--output", type=Path, default=None, help="path for the JSON result (default runs/<trace_id>/result.json)")
     parser.add_argument("--no-trace", action="store_true", help="skip per-stage dumps to runs/")
     parser.add_argument("-v", "--verbose", action="store_true", help="show per-stage progress logs")
@@ -97,7 +101,30 @@ def main() -> int:
     configure_logging(default_level="INFO", override_level="INFO" if args.verbose else None)
 
     try:
-        result = asyncio.run(run_pipeline(args.brief, total_budget_usd=args.budget, trace=not args.no_trace))
+        publishers = (
+            normalize_publishers([Publisher.model_validate(p) for p in json.loads(args.publishers.read_text())])
+            if args.publishers
+            else None
+        )
+        personas = (
+            normalize_personas([Persona.model_validate(p) for p in json.loads(args.personas.read_text())])
+            if args.personas
+            else None
+        )
+    except Exception as err:  # bad catalog file — fail before the pipeline runs
+        print(f"error: could not load catalog — {err}", file=sys.stderr)
+        return 1
+
+    try:
+        result = asyncio.run(
+            run_pipeline(
+                args.brief,
+                total_budget_usd=args.budget,
+                trace=not args.no_trace,
+                publishers=publishers,
+                personas=personas,
+            )
+        )
     except Exception as err:  # surface a clean failure, not a stack trace
         print(f"error: pipeline failed — {err}", file=sys.stderr)
         return 1
